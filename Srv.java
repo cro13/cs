@@ -58,20 +58,28 @@ class Conexiune extends Thread { // Clasa Conexiune extinde Thread si presupune 
     this.users=users;
     os = new DataOutputStream(cs.getOutputStream());// cel de iesire
    
-    String message = is.readUTF(); // citim un mesaj prin fluxul de intrare
-    System.out.println("S-a incercat conectarea cu utilizatorul: "+message);
-       while(users.contains(message) == true)
-        {
-          sockete.get(i).writeUTF("try again");
-           message = is.readUTF();
-           System.out.println("S-a incercat conectarea cu utilizatorul: "+message);
-        }
-        this.users.add(message);
-        sockete.get(i).writeUTF("connected"); 
-        System.out.println("Utilizatorul cu numele: "+message+" s-a connectat cu succes!");
+   
     
     start(); // pornim threadu-ul
   }
+  
+ public void fdc(int j){//functia de deconectare fortata a unui utilizator - cand a ales un nume gresit
+    try{
+    sockete.get(j).writeUTF("fexit");
+    sockete.remove(j);
+    Srv.i--;
+    os.close();
+    is.close();
+    cs.close();
+    }
+    catch(IOException e){
+     System.out.println("Deconectare esuata");   
+    }
+  
+}
+  
+  
+  
 public void dc(int j){//functia de deconectare a unui utilizator
     try{
    
@@ -80,63 +88,107 @@ public void dc(int j){//functia de deconectare a unui utilizator
     users.remove(j);
     sockete.remove(j);
     Srv.i--;
-    //os.close();
-   // is.close();
-   // cs.close();
+    os.close();
+    is.close();
+    cs.close();
     }
     catch(IOException e){
      System.out.println("Deconectare esuata");   
     }
   
 }
-  public void run() { // metoda ce se apleaza la pornirea threadului
+  public void run() {
+      String curent="";// metoda ce se apleaza la pornirea threadului
     try {
+        int i=identitate;
+        System.out.println(i);
+        String message = is.readUTF(); // citim un mesaj prin fluxul de intrare
+        System.out.println("S-a incercat conectarea cu utilizatorul: " + message);
+        while(users.contains(message) == true)
+        {
+         System.out.println("Un user cu acest nume este deja conectat"); 
+         fdc(i);
+         return;
+        }
+        this.users.add(message);
+        curent = message;
+        sockete.get(i).writeUTF("connected"); 
+        System.out.println("Utilizatorul cu numele: "+message+" s-a connectat cu succes!");
+        
        while (true) { // blocam firul threadului cu un loop ce primeste mesaje de la client
-           int j=identitate;
-           int k;
-           String curent=users.get(j);
-           String message = is.readUTF(); // citim un mesaj prin fluxul de intrare
-                     
+       
+           i=users.indexOf(curent);
+           
+           message = is.readUTF(); // citim un mesaj prin fluxul de intrare
+          
                if(message.equals("QUIT"))
                {
-                   dc(j);
+                   i = users.indexOf(curent);
+                   dc(i);
                    return;
                }
-               
-               if(message.equals("LIST"))
-               {
-                   k=users.indexOf(curent);
-                   System.out.println(k);
-                   String allusers="";
-                   for(String x:users)
-                   {allusers+=x;
-                    allusers+="-";
+               else
+                   if(message.equals("LIST")){
+                       i = users.indexOf(curent);
+                       System.out.println(i);
+                       String allusers = "";
+                       for(String x : users)
+                       {
+                           allusers += x;
+                           allusers+="-";
+                       }
+                       sockete.get(i).writeUTF("USERS");
+                       sockete.get(i).writeUTF(allusers);
+                   //System.out.println(parts.length);  
                    }
-                   sockete.get(k).writeUTF("USERS");
-                   sockete.get(k).writeUTF(allusers);
-                   //System.out.println(parts.length);
-               
-               }
-               
-               if(message.contains("NICK")){
-                   k=users.indexOf(curent);
-                   String[] parts = message.split(" ");
-                   String cmd,parametru;
-                   cmd = parts[0];
-                   parametru = parts[1];
-                   if(users.contains(parametru)==false)
-                         users.set(k,parametru);
                    else
-                       sockete.get(k).writeUTF("Userul exista deja! Comanda esuata!");
-               }
-               
-               
-                System.out.println(message);  // il afisam
-                for(int i=0;i<sockete.size();i++) // apoi parcurgem lista de clienti conectati la server si le trimitem                   
-                    sockete.get(i).writeUTF(message);    // mesajul ce tocmai a fost primit
+                       if(message.contains("NICK")){
+                           i = users.indexOf(curent);
+                           String[] parts = message.split(" ");
+                           String parametru;
+                           parametru = parts[1];
+                           if(users.contains(parametru) == false)
+                               users.set(i,parametru);
+                           else
+                               sockete.get(i).writeUTF("Userul exista deja! Comanda esuata!");
+                       }
+                       else
+                           if(message.contains("BCAST")){
+                               //  i=users.indexOf(curent);
+                               String[] parts = message.split(" ");
+                               String parametru;
+                               parametru = parts[1];
+                               for(int t = 0 ; t < sockete.size() ; t++)
+                                   sockete.get(t).writeUTF(parametru);
+                           }
+                           else
+                               if(message.contains("MSG")){
+                                   i = users.indexOf(curent);
+                                   String[] parts = message.split(" ");
+                                   String utilizator,msg;
+                                   utilizator = parts[1];
+                                   msg = parts[2];
+                                   int ki = users.indexOf(utilizator);
+                                   if(ki != -1)
+                                       sockete.get(ki).writeUTF("Utilizatorul "+ users.get(i)+" ti-a transmis mesajul: '"+msg+"'");
+                                   else
+                                       sockete.get(i).writeUTF("Utilizatorul " +utilizator+" nu exista");
+                  
+                               } 
+                               else
+                                   if(!message.equals("") && !message.equals(" ") && !message.equals('\n'))              {
+                                       i = users.indexOf(curent);
+                                       sockete.get(i).writeUTF("Comanda nu exista");
+                                       System.out.println("Comanda negasita");
+                                   }
+               System.out.println(message);  // il afisam
+               // for(i=0;i<sockete.size();i++) // apoi parcurgem lista de clienti conectati la server si le trimitem                   
+                 //   sockete.get(i).writeUTF(message);    // mesajul ce tocmai a fost primit
                 
-            }
+       }
     }
-    catch(Exception e) { }
+    catch(Exception e) {
+      
+    }
   }
 }

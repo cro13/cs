@@ -17,64 +17,61 @@ class Cln {
     System.out.print("Alegeti  nickul : ");
     String nick = "";
     nick = sc.nextLine();
-    String st="";
+    String st = "";
     System.out.print("Adresa serverului si portul : ");
-    
-    Socket cs = new Socket( sc.next(), sc.nextInt() ); // instantiem un socket la adresa si portul citit de la tastatura
+    String ip = sc.next();
+    int port = sc.nextInt();
+    Socket cs = new Socket( ip, port ); // instantiem un socket la adresa si portul citit de la tastatura
     // socket-ul va fi obiectul ce se va conecta la server si prin intermediul caruia vom transmite si primi date
     
     DataOutputStream os = new DataOutputStream( cs.getOutputStream()); // declaram un obiect de tipul DataOutputStream
     // ce va lucra cu fluxul de iesire al socket-ului
      
      os.writeUTF(nick);
-    boolean fin=true;
-    final DataInputStream is = new DataInputStream( cs.getInputStream()); // analog pentru fluxul de intrare
-    String reply="";
-    
-    while(fin==true){
-        try{
-            reply=is.readUTF();
-         }
-        catch(IOException e){ continue;}
-    while(reply.equals("try again"))
-    {
-        System.out.println("Nick deja folosit!Introdu un alt nick");
-        nick=sc.nextLine();
-         while(nick.equals(""))
-         {
-             nick=sc.nextLine();
-         }
-        os.writeUTF(nick);
-        reply=is.readUTF();
-       
+   final DataInputStream is = new DataInputStream( cs.getInputStream()); // analog pentru fluxul de intrare
+    try{
+        String reply = "";
+        reply = is.readUTF();
+        if(reply.equals("connected")){
+            System.out.println("Connectare reusita");
+        }
+        else
+            if(reply.equals("fexit")){
+                System.out.println("Un utilizator cu acest nume este deja conectat! Alegeti alt nume");
+                System.exit(0);
+            }
+            
     }
-    if(reply.equals("connected"))
-        fin=false;
-     System.out.println(reply);
-    }
+    catch (Exception e){}
     
     Thread T= new Thread(new Runnable(){  // declaram si instantiam Thread-ul ce se va ocupa cu primirea
         // mesajelor de la server
              public void run() { // metoda ce va fi apelata cand thread-ul este pornit
+                
+                 
+                 
               while (true) {// blocam firul printr-un loop infinit ce primeste mesaje de la server
                   String s = ""; // 
                   try {
                       s = is.readUTF();   // primim mesajul de la server
-                      
-                      if(s.equals("exit")){System.out.println("Deconectare reusita!");
-                      System.exit(0);}
-                                            
-                      if(s.equals("USERS")){
-                          String allusers=is.readUTF();
-                          String[] parts = allusers.split("-");
-                          for(int p=0;p<parts.length;p++)
-                             System.out.println(parts[p]);
-                          
+                      System.out.println(s);
+                      if(s.equals("exit")){
+                          System.out.println("Deconectare reusita!");
+                          System.exit(0);
                       }
+                                          
+                      if(s.equals("USERS")){
+                          String allusers = is.readUTF();
+                          String[] parts = allusers.split("-");
+                          for(int p = 0 ; p < parts.length ; p++)
+                             System.out.println(parts[p]);
+                          }
                       
                      // System.out.println(s); // afisam ce am primit
                   }
                   catch (IOException ex) {
+                      System.out.println("Serverul s-a deconectat");
+                      System.exit(0);
                   }
                  
               }
