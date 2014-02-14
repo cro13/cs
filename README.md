@@ -3,7 +3,7 @@ Chat Client - Server Java
 
 Client-Server application in Java
 It's a chat client-server application written in java that implements the following commands:
-LIST - list the users connected to the server &nbsp
+LIST - list the users connected to the server <br>
 MSG - sends a private message to a selected user
 BCAST - sends a message to all users connected
 NICK - changes the username of the current user to the one selected
