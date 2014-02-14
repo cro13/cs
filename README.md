@@ -1,4 +1,4 @@
-cs
+Chat Client - Server Java
 ==
 
 Client-Server application in Java
