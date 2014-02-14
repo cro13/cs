@@ -1,15 +1,15 @@
-Chat Client - Server Java
-==
+<b>Chat Client - Server Java</b><br>
+==<br><br>
 
 Client-Server application in Java
-It's a chat client-server application written in java that implements the following commands:
-LIST - list the users connected to the server <br>
-MSG - sends a private message to a selected user
-BCAST - sends a message to all users connected
-NICK - changes the username of the current user to the one selected
-QUIT - deconnects the user
+It's a chat client-server application written in java that implements the following commands:<br>
+LIST - list the users connected to the server<br>
+MSG - sends a private message to a selected user<br>
+BCAST - sends a message to all users connected<br>
+NICK - changes the username of the current user to the one selected<br>
+QUIT - deconnects the user<br>
+<br><br>
 
-
-Rules
-two users connected to the server can not have the same nickname
+<b>Rules</b><br>
+two users connected to the server can not have the same nickname<br>
 errors such as "user does not exist" are properly handled
