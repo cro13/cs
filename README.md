@@ -1,7 +1,7 @@
 <b>Chat Client - Server Java</b><br>
 ==<br><br>
 
-Client-Server application in Java
+<b>Client-Server application in Java</b><br>
 It's a chat client-server application written in java that implements the following commands:<br>
 LIST - list the users connected to the server<br>
 MSG - sends a private message to a selected user<br>
