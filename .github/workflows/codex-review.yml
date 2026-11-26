@@ -1,0 +1,93 @@
+# Merging into main waits for Codex. This keeps a "Codex review" status on a pull request's latest commit: yellow
+# until Codex has finished reviewing that exact commit, green once it has. main's ruleset needs that status, and it
+# needs every review conversation resolved too, so each Codex finding has to be fixed or dismissed before merging.
+# Codex reviews when a pull request opens or is marked ready. After pushing fixes, comment "@codex review" so it
+# looks at the new commit. Codex's own summary comment on the pull request carries its state; this reads it.
+#
+# pull_request_target and issue_comment both run this file as it is on main, never a pull request's copy, so a pull
+# request can't change the gate to pass itself. Nothing here checks out or runs the pull request's code.
+name: Codex review
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  statuses: write
+  pull-requests: read
+  issues: read
+
+# One run at a time per pull request, in order, so an older run never overwrites a newer status.
+concurrency:
+  group: codex-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  status:
+    name: Set the Codex status
+    # Comments only count when they are Codex's own, on a pull request.
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      (github.event.issue.pull_request && github.event.comment.user.login == 'chatgpt-codex-connector[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read Codex's summary and set the status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          bot='chatgpt-codex-connector[bot]'
+          head=$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)
+          short=${head:0:7}
+          link="https://github.com/$REPO/pull/$PR"
+
+          post() {
+            gh api -X POST "repos/$REPO/statuses/$head" -f context='Codex review' \
+              -f state="$1" -f description="$2" -f target_url="$link" > /dev/null
+            echo "$1: $2"
+            echo "**Codex review** ($short): $2" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          comments=$(gh api --paginate "repos/$REPO/issues/$PR/comments?per_page=100" | jq -sc --arg bot "$bot" \
+            '[add[] | select(.user.login == $bot)]')
+
+          # Codex keeps one summary comment per pull request, with its state as JSON in an HTML comment:
+          # <!-- codex-review-state:v1 {"code_review":{"commit_sha":"…","status":"completed","has_any_findings":…}} -->
+          summary=$(jq -c '[.[] | select(.body | contains("codex-review-state:v1"))] | last // empty' <<< "$comments")
+          if [ -z "$summary" ]; then
+            # Without an environment for the repo, Codex answers "To use Codex here, create an environment…" instead.
+            if jq -e 'any(.[]; .body | contains("create an environment for this repo"))' <<< "$comments" > /dev/null; then
+              link='https://chatgpt.com/codex/cloud/settings/environments'
+              post error "Codex has no environment for this repo. Create one in Codex settings, then comment @codex review"
+            else
+              post pending "Waiting for Codex to review $short"
+            fi
+            exit 0
+          fi
+          link=$(jq -r .html_url <<< "$summary")
+          state=$(jq -c '.body | capture("codex-review-state:v1 (?<j>\\{.*\\}) -->").j | fromjson | .code_review' \
+            <<< "$summary" 2> /dev/null || true)
+          if [ -z "$state" ] || [ "$state" = null ]; then
+            post error "Couldn't read Codex's summary comment. Its format may have changed."
+            exit 0
+          fi
+          status=$(jq -r '.status // ""' <<< "$state")
+          reviewed=$(jq -r '.commit_sha // ""' <<< "$state")
+          findings=$(jq -r '.has_any_findings // false' <<< "$state")
+
+          if [ "$reviewed" != "$head" ]; then
+            post pending "Codex hasn't reviewed $short yet. If it isn't running, comment @codex review"
+          elif [ "$status" = completed ] && [ "$findings" = true ]; then
+            post success "Codex reviewed $short. Fix or resolve each of its comments to merge"
+          elif [ "$status" = completed ]; then
+            post success "Codex reviewed $short and found nothing"
+          elif [[ "$status" =~ fail|error|cancel|timed ]]; then
+            post error "Codex's review of $short stopped ($status). Comment @codex review to try again"
+          else
+            post pending "Codex is reviewing $short"
+          fi
