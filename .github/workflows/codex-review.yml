@@ -19,11 +19,6 @@ permissions:
   pull-requests: read
   issues: read
 
-# One run at a time per pull request, in order, so an older run never overwrites a newer status.
-concurrency:
-  group: codex-review-${{ github.event.pull_request.number || github.event.issue.number }}
-  cancel-in-progress: false
-
 jobs:
   status:
     name: Set the Codex status
@@ -31,6 +26,11 @@ jobs:
     if: >-
       github.event_name == 'pull_request_target' ||
       (github.event.issue.pull_request && github.event.comment.user.login == 'chatgpt-codex-connector[bot]')
+    # One run at a time per pull request, so an older run never overwrites a newer status. The group sits on the job,
+    # not the workflow: a skipped run for someone else's comment must never replace a queued run for Codex's.
+    concurrency:
+      group: codex-review-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
